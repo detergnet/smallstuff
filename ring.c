@@ -6,11 +6,17 @@
  */
 #include "ring.h"
 
+static inline size_t
+ring_index(struct ring *r, size_t n)
+{
+	size_t until_end = r->count - r->start;
+	return (n >= until_end) ? n - until_end : r->start + n;
+}
+
 static inline void *
 ring_nth(struct ring *r, size_t n)
 {
-	size_t index = (r->start + n) % r->count;
-	return (char *) r->data + index * r->size;
+	return (char *) r->data + ring_index(r, n) * r->size;
 }
 
 void *
