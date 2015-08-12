@@ -23,7 +23,7 @@
  * - the `data` field must be a pointer to an element of an array
  * - the `size` field must be set to the size of an element
  * - the `count` field must be set to the number of elements pointed by `data`
- * - the `start` and used fields must be 0
+ * - the `start` and `used` fields must be 0
  *
  * Intended usage:
  *
@@ -106,6 +106,50 @@ void *ring_next(struct ring *r, void *p);
  * NOTE: Calling the `ring_pop_*` functions might break the above invariant.
  */
 void *ring_prev(struct ring *r, void *p);
+
+/*
+ * Returns the number of elements available in the ring and optionally two
+ * `(pointer, count)` tuples describing the available regions. The user can use
+ * these two buffers for bulk storage of elements. The returned regions are NOT
+ * automatically marked as used; after storing N elements, the user is
+ * responsible for adjusting the `used` field of the ring object by adding N.
+ * The two buffers must be filled in order by the user.
+ * If the `first` argument is NULL, the rest of the arguments are not touched
+ * (no region information is returned). Otherwise, if `last` is NULL, the rest
+ * of the arguments are not touched (only the first region information is
+ * returned). If region information is requested, the pointers returned are
+ * guaranteed to be valid even if the corresponding region size is 0.
+ *
+ * NOTE: `fcount` can be NULL only if `first` is NULL; `lcount` can be NULL
+ * only if either `first` or `last` are NULL.
+ *
+ * Example use case:
+ *
+ * char array[N];
+ * struct ring r = { array, sizeof *array, sizeof array / sizeof *array };
+ * struct iovec v[2];
+ *
+ * // use `r` with `ring_push_*`, `ring_pop_*`, etc.
+ * ...
+ *
+ * // bulk feed elements to `r` from a file descriptor `fd`
+ * ring_avail(&r, &v[0].iov_base, &v[0].iov_len, &v[1].iov_base,
+ *     &v[1].iov_len);
+ * r.used += readv(fd, v, 2);
+ *
+ * // continue processing elements from `r` using `ring_pop_*`.
+ * ...
+ */
+size_t ring_avail(struct ring *r, void **first, size_t *fcount,
+    void **last, size_t *lcount);
+
+/*
+ * Returns the number of elements present in the ring. Works the same as
+ * `ring_avail`.
+ * NOTE: The returned regions are NOT automatically marked as consumed.
+ */
+size_t ring_used(struct ring *r, void **first, size_t *fcount,
+    void **last, size_t *lcount);
 
 /*
  * Convenience macro for iterating all the elements in a ring buffer, from
